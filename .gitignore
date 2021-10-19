@@ -1,2 +1,5 @@
 # folders
 __pycache__/
+
+# others
+*.vscode
