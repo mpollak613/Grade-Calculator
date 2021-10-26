@@ -2,7 +2,7 @@ from CollegeClass import *
 
 
 def Example():
-    # Real example of a class:
+    # Example of a class:
     apmth_226 = CollegeClass(name="Neural Computation", units=4, letterScale=GenScale)
     apmth_226.institution = "Harvard University"
     apmth_226.details = "APMTH 226 #212912"
