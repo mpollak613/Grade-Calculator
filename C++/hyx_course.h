@@ -9,6 +9,7 @@
 
 #include <array> // array
 #include <climits> // INT_MAX
+#include <ctime> // tm
 #include <ostream> // ostream
 #include <string> // string
 #include <tuple> // tuple
@@ -152,13 +153,13 @@ namespace hyx
 
         [[nodiscard]] const std::string get_week_days() const noexcept;
 
-        [[nodiscard]] const std::string get_start_date() const noexcept;
+        [[nodiscard]] const std::tm get_start_date() const noexcept;
 
-        [[nodiscard]] const std::string get_end_date() const noexcept;
+        [[nodiscard]] const std::tm get_end_date() const noexcept;
 
-        [[nodiscard]] const std::string get_start_time() const noexcept;
+        [[nodiscard]] const std::tm get_start_time() const noexcept;
 
-        [[nodiscard]] const std::string get_end_time() const noexcept;
+        [[nodiscard]] const std::tm get_end_time() const noexcept;
 
         [[nodiscard]] const std::vector<std::string>& get_books() const noexcept;
 
@@ -242,13 +243,13 @@ namespace hyx
 
         [[nodiscard]] const std::string get_lab_week_days() const noexcept;
 
-        [[nodiscard]] const std::string get_lab_start_date() const noexcept;
+        [[nodiscard]] const std::tm get_lab_start_date() const noexcept;
 
-        [[nodiscard]] const std::string get_lab_end_date() const noexcept;
+        [[nodiscard]] const std::tm get_lab_end_date() const noexcept;
 
-        [[nodiscard]] const std::string get_lab_start_time() const noexcept;
+        [[nodiscard]] const std::tm get_lab_start_time() const noexcept;
 
-        [[nodiscard]] const std::string get_lab_end_time() const noexcept;
+        [[nodiscard]] const std::tm get_lab_end_time() const noexcept;
 
     };
 

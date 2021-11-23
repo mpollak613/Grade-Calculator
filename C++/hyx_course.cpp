@@ -22,9 +22,9 @@ static const std::string vec_helper(std::vector<std::string> vec) noexcept;
 
 const std::vector<std::string> weave(const std::vector<std::unordered_map<std::string, std::string>>& vec) noexcept;
 
-static const std::string date_helper(std::array<int, 5> date_time) noexcept;
+static const std::string to_ISO_date(std::tm date_time) noexcept;
 
-static const std::string time_helper(std::array<int, 5> date_time) noexcept;
+static const std::string to_ISO_time(std::tm date_time) noexcept;
 
 
 std::ostream& hyx::operator<<(std::ostream& os, const hyx::Grade_scale& scale) noexcept
@@ -102,8 +102,8 @@ std::ostream& hyx::operator<<(std::ostream& os, const hyx::Course& course) noexc
         << "Details: " << course.get_details() << '\n'
         << "CRN: " << course.get_crn() << '\n'
         << "Days: " << course.get_week_days() << '\n'
-        << "Time: " << course.get_start_time() << " - " << course.get_end_time() << '\n'
-        << "Date: " << course.get_start_date() << " -- " << course.get_end_date() << '\n'
+        << "Time: " << to_ISO_time(course.get_start_time()) << " - " << to_ISO_time(course.get_end_time()) << '\n'
+        << "Date: " << to_ISO_date(course.get_start_date()) << " -- " << to_ISO_date(course.get_end_date()) << '\n'
         << "Location: " << course.get_location() << '\n'
         << "Instructor: " << course.get_instructor() << '\n'
         << "Grade: " << ((course.get_grade() == -1) ? "N/A" : std::to_string(course.get_grade()) + "%") << '\n'
@@ -127,10 +127,10 @@ std::ostream& hyx::operator<<(std::ostream& os, const hyx::CourseWLAB& course) n
         << "CRN: " << course.get_crn() << '\n'
         << "Days: " << course.get_week_days() << '\n'
         << "Lab Days: " << course.get_lab_week_days() << '\n'
-        << "Time: " << course.get_start_time() << " - " << course.get_end_time() << '\n'
-        << "Date: " << course.get_start_date() << " - " << course.get_end_date() << '\n'
-        << "Lab Time: " << course.get_lab_start_time() << " - " << course.get_lab_end_time() << '\n'
-        << "Lab Date: " << course.get_lab_start_date() << " - " << course.get_lab_end_date() << '\n'
+        << "Time: " << to_ISO_time(course.get_start_time()) << " - " << to_ISO_time(course.get_end_time()) << '\n'
+        << "Date: " << to_ISO_date(course.get_start_date()) << " - " << to_ISO_date(course.get_end_date()) << '\n'
+        << "Lab Time: " << to_ISO_time(course.get_lab_start_time()) << " - " << to_ISO_time(course.get_lab_end_time()) << '\n'
+        << "Lab Date: " << to_ISO_date(course.get_lab_start_date()) << " - " << to_ISO_date(course.get_lab_end_date()) << '\n'
         << "Location: " << course.get_location() << '\n'
         << "Lab Location: " << course.get_location() << '\n'
         << "Instructor: " << course.get_instructor() << '\n'
@@ -447,41 +447,41 @@ const std::string hyx::Course::get_week_days() const noexcept
     return week_day_helper(this->week_days_);
 }
 
-const std::string date_helper(std::array<int, 5> date_time) noexcept
+const std::string to_ISO_date(std::tm date) noexcept
 {
-    std::tm time{};
-    time.tm_year = date_time[0] - 1900;
-    time.tm_mon = date_time[1] - 1;
-    time.tm_mday = date_time[2];
-
     char buff[11];
 
-    //std::strftime(buff, 11, "%m/%d/%Y", &time);
-    std::strftime(buff, 11, "%Y-%m-%d", &time);
+    std::strftime(buff, 11, "%Y-%m-%d", &date);
 
     return buff;
 }
 
-const std::string hyx::Course::get_start_date() const noexcept
+const std::tm hyx::Course::get_start_date() const noexcept
 {
-    return date_helper(this->start_datetime_);
+    std::tm date{};
+    date.tm_year = this->start_datetime_[0] - 1900;
+    date.tm_mon = this->start_datetime_[1] - 1;
+    date.tm_mday = this->start_datetime_[2];
+
+    return date;
 }
 
-const std::string hyx::Course::get_end_date() const noexcept
+const std::tm hyx::Course::get_end_date() const noexcept
 {
-    return date_helper(this->end_datetime_);
+    std::tm date{};
+    date.tm_year = this->end_datetime_[0] - 1900;
+    date.tm_mon = this->end_datetime_[1] - 1;
+    date.tm_mday = this->end_datetime_[2];
+
+    return date;
 }
 
-const std::string time_helper(std::array<int, 5> date_time) noexcept
+const std::string to_ISO_time(std::tm time) noexcept
 {
-    if (date_time[3] == -1 || date_time[4] == -1)
+    if (time.tm_hour == -1 || time.tm_min == -1)
     {
         return "";
     }
-
-    std::tm time{};
-    time.tm_hour = date_time[3];
-    time.tm_min = date_time[4];
 
     char buff[9];
 
@@ -490,14 +490,22 @@ const std::string time_helper(std::array<int, 5> date_time) noexcept
     return buff;
 }
 
-const std::string hyx::Course::get_start_time() const noexcept
+const std::tm hyx::Course::get_start_time() const noexcept
 {
-    return time_helper(this->start_datetime_);
+    std::tm time{};
+    time.tm_hour = this->start_datetime_[3];
+    time.tm_min = this->start_datetime_[4];
+
+    return time;
 }
 
-const std::string hyx::Course::get_end_time() const noexcept
+const std::tm hyx::Course::get_end_time() const noexcept
 {
-    return time_helper(this->end_datetime_);
+    std::tm time{};
+    time.tm_hour = this->end_datetime_[3];
+    time.tm_min = this->end_datetime_[4];
+
+    return time;
 }
 
 const std::vector<std::string>& hyx::Course::get_books() const noexcept
@@ -766,24 +774,42 @@ const std::string hyx::CourseWLAB::get_lab_week_days() const noexcept
     return week_day_helper(this->lab_week_days_);
 }
 
-const std::string hyx::CourseWLAB::get_lab_start_date() const noexcept
+const std::tm hyx::CourseWLAB::get_lab_start_date() const noexcept
 {
-    return date_helper(this->lab_start_datetime_);
+    std::tm date{};
+    date.tm_year = this->lab_start_datetime_[0] - 1900;
+    date.tm_mon = this->lab_start_datetime_[1] - 1;
+    date.tm_mday = this->lab_start_datetime_[2];
+
+    return date;
 }
 
-const std::string hyx::CourseWLAB::get_lab_end_date() const noexcept
+const std::tm hyx::CourseWLAB::get_lab_end_date() const noexcept
 {
-    return date_helper(this->lab_end_datetime_);
+    std::tm date{};
+    date.tm_year = this->lab_end_datetime_[0] - 1900;
+    date.tm_mon = this->lab_end_datetime_[1] - 1;
+    date.tm_mday = this->lab_end_datetime_[2];
+
+    return date;
 }
 
-const std::string hyx::CourseWLAB::get_lab_start_time() const noexcept
+const std::tm hyx::CourseWLAB::get_lab_start_time() const noexcept
 {
-    return time_helper(this->lab_start_datetime_);
+    std::tm time{};
+    time.tm_hour = this->lab_start_datetime_[3];
+    time.tm_min = this->lab_start_datetime_[4];
+
+    return time;
 }
 
-const std::string hyx::CourseWLAB::get_lab_end_time() const noexcept
+const std::tm hyx::CourseWLAB::get_lab_end_time() const noexcept
 {
-    return time_helper(this->lab_end_datetime_);
+    std::tm time{};
+    time.tm_hour = this->lab_end_datetime_[3];
+    time.tm_min = this->lab_end_datetime_[4];
+
+    return time;
 }
 
 float hyx::get_GPA(const std::vector<hyx::Course>& courses) noexcept
