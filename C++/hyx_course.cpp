@@ -596,32 +596,40 @@ bool hyx::weighted_course::add_category(std::string name, double weight, int dro
 // POINT_COURSE
 //
 
-double hyx::point_course::get_total_points() const noexcept
+void hyx::point_course::update_grade() noexcept
 {
-    return this->m_total_points;
-}
-
-bool hyx::point_course::add_category(std::string name, int drop, std::pair<int, std::string> replace) noexcept
-{
-    bool success{false};
-
     if (not this->is_withdrawn() && not this->is_replaced())
     {
-        std::transform(name.begin(), name.end(), name.begin(),
-            [](unsigned char c) { return toupper(c); });
+        double total_earned_points = 0.0;
+        double total_possible_points = 0.0;
 
-        std::transform(replace.second.begin(), replace.second.end(), replace.second.begin(),
-            [](unsigned char c) { return toupper(c); });
+        for (const auto &itr_grade : this->m_grade)
+        {
+            if (itr_grade.second.points_percent.empty())
+            {
+                // continue;
+            }
+            else
+            {
+                hyx::grade_container grades{itr_grade.second};
 
-        this->m_grade[name];
-        this->m_grade[name].num_of_drops = drop;
-        this->m_grade[name].num_of_replacements = replace.first;
-        this->m_grade[name].replacement_name = replace.second;
+                this->drop_grades(grades);
 
-        success = true;
+                this->replace_grades(grades);
+
+                // if all of the grades have been dropped then skip
+                if (not grades.points_percent.empty())
+                {
+                    total_earned_points += std::accumulate(grades.points_earned.begin(), grades.points_earned.end(), 0.0);
+                    total_possible_points += std::accumulate(grades.points_possible.begin(), grades.points_possible.end(), 0.0);
+                }
+            }
+        }
+
+        this->m_grade_percent = (total_earned_points + this->m_extra) * 100.0 / total_possible_points;
+        this->update_letter();
+        this->update_grade_points();
     }
-
-    return success;
 }
 
 hyx::point_course::point_course(
@@ -661,6 +669,34 @@ hyx::point_course::point_course(
     ),
     m_total_points(t_total_points)
 {
+}
+
+double hyx::point_course::get_total_points() const noexcept
+{
+    return this->m_total_points;
+}
+
+bool hyx::point_course::add_category(std::string name, int drop, std::pair<int, std::string> replace) noexcept
+{
+    bool success{false};
+
+    if (not this->is_withdrawn() && not this->is_replaced())
+    {
+        std::transform(name.begin(), name.end(), name.begin(),
+            [](unsigned char c) { return toupper(c); });
+
+        std::transform(replace.second.begin(), replace.second.end(), replace.second.begin(),
+            [](unsigned char c) { return toupper(c); });
+
+        this->m_grade[name];
+        this->m_grade[name].num_of_drops = drop;
+        this->m_grade[name].num_of_replacements = replace.first;
+        this->m_grade[name].replacement_name = replace.second;
+
+        success = true;
+    }
+
+    return success;
 }
 
 //
