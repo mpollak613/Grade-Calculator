@@ -15,11 +15,16 @@
 #include <iomanip>    // setw, left, right
 #include <iterator>   // back_inserter
 #include <limits>     // numeric_limits
+#include <memory.h>   // unique_ptr
 #include <numeric>    // accumulate
 #include <ostream>    // ostream
 #include <sstream>    // stringstream
 #include <string>     // string
 
+
+//
+// SCHOOL
+//
 
 hyx::school::school(
     std::string t_name,
@@ -40,10 +45,16 @@ const hyx::school::grade_point_scale& hyx::school::get_scale() const noexcept
     return this->m_scale;
 }
 
+
+//
+// COURSE
+//
+
 void hyx::course::update_letter() noexcept
 {
     double grade_percent{this->m_grade_percent};
 
+    // in the case the grade percent is greater than 100 
     if (this->m_grade_percent > 100)
     {
         grade_percent = 100;
@@ -84,7 +95,7 @@ bool hyx::course::update_grade_points() noexcept
     return success;
 }
 
-void hyx::course::drop_grades(grade_container& grades) noexcept
+void hyx::course::drop_grades(hyx::grade_container& grades) noexcept
 {
     // drop lowest grades as necessary
     for (size_t i = 0; i < grades.num_of_drops && not grades.points_percent.empty(); ++i)
@@ -97,7 +108,7 @@ void hyx::course::drop_grades(grade_container& grades) noexcept
     }
 }
 
-void hyx::course::replace_grades(grade_container& grades) noexcept
+void hyx::course::replace_grades(hyx::grade_container& grades) noexcept
 {
     // replace grades as necessary
     for (size_t i = 0; i < grades.num_of_replacements && this->m_grade.count(grades.replacement_name) && not this->m_grade[grades.replacement_name].points_percent.empty() && not grades.points_percent.empty(); ++i)
@@ -119,14 +130,14 @@ hyx::course::course(
     std::string t_name,
     long t_crn,
     int t_units,
-    grade_scale t_scale,
+    hyx::grade_scale t_scale,
     hyx::school* t_institution,
     std::string t_location,
     std::string t_instructor,
     std::string t_subject,
     std::string t_level,
     std::string t_details,
-    std::vector<week_day> t_week_days,
+    std::vector<hyx::week_day> t_week_days,
     std::array<int, 3> t_start_date,
     std::array<int, 3> t_end_date,
     std::array<int, 2> t_start_time,
@@ -344,6 +355,11 @@ float hyx::course::get_grade_points() const noexcept
     return this->m_grade_points;
 }
 
+void hyx::course::link_course(std::shared_ptr<hyx::course> course) noexcept
+{
+    this->m_linked_courses.push_back(course);
+}
+
 bool hyx::course::is_withdrawn() const noexcept
 {
     return this->get_letter() == "W";
@@ -435,6 +451,228 @@ void hyx::course::add_extra_to_total(double extra)
     this->update_grade();
 }
 
+//
+// WEIGHTED_COURSE
+//
+
+bool hyx::weighted_course::has_good_weights() noexcept
+{
+    double total_weight = 0.0;
+
+    std::for_each(this->m_grade.begin(), this->m_grade.end(),
+        [&](const auto& itr) { total_weight += itr.second.weight; });
+
+    return (std::abs(1 - total_weight) < std::numeric_limits<float>::epsilon()) ? true : false;
+}
+
+void hyx::weighted_course::update_grade() noexcept
+{
+    if (not this->is_withdrawn() && not this->is_replaced() && this->has_good_weights())
+    {
+        double final_grade = 0.0f;
+        double unused_weight = 0.0f;
+
+        for (const auto& itr_grade : this->m_grade)
+        {
+            // if there are points to calculate
+            if (itr_grade.second.points_percent.empty())
+            {
+                unused_weight += itr_grade.second.weight;
+            }
+            else
+            {
+                hyx::grade_container grades{itr_grade.second};
+
+                this->drop_grades(grades);
+
+                this->replace_grades(grades);
+
+                // if all of the grades have been dropped, then treat as if no grades were given
+                if (grades.points_percent.empty())
+                {
+                    unused_weight += grades.weight;
+                }
+                else
+                {
+                    // sum group's grades and apply its weights
+                    final_grade += grades.weight * (std::accumulate(grades.points_earned.begin(), grades.points_earned.end(), 0.0) / std::accumulate(grades.points_possible.begin(), grades.points_possible.end(), 0.0));
+                }
+            }
+        }
+
+        // update stats if there are grades left over.
+        if ((1.0 - unused_weight) > std::numeric_limits<double>::epsilon())
+        {
+            this->m_grade_percent = final_grade * 100.0 / (1.0 - unused_weight) + this->m_extra;
+            this->update_letter();
+            this->update_grade_points();
+        }
+    }
+}
+
+hyx::weighted_course::weighted_course(
+    std::string t_name,
+    long t_crn,
+    int t_units,
+    hyx::grade_scale t_scale,
+    hyx::school* t_institution,
+    std::string t_location,
+    std::string t_instructor,
+    std::string t_subject,
+    std::string t_level,
+    std::string t_details,
+    std::vector<hyx::week_day> t_week_days,
+    std::array<int, 3> t_start_date,
+    std::array<int, 3> t_end_date,
+    std::array<int, 2> t_start_time,
+    std::array<int, 2> t_end_time
+) :
+    course(
+        t_name,
+        t_crn,
+        t_units,
+        t_scale,
+        t_institution,
+        t_location,
+        t_instructor,
+        t_subject,
+        t_level,
+        t_details,
+        t_week_days,
+        t_start_date,
+        t_end_date,
+        t_start_time,
+        t_end_time
+    )
+{
+}
+
+const std::unordered_map<std::string, std::string> hyx::weighted_course::get_weights() const noexcept
+{
+    std::unordered_map<std::string, std::string> vstr_weights;
+    
+    for (const auto& itr_grade : this->m_grade)
+    {
+        // only emplace grade categories with a name.
+        if (not itr_grade.first.empty())
+        {
+            vstr_weights.emplace(itr_grade.first, std::to_string(itr_grade.second.weight));
+        }
+    }
+
+    if (this->m_extra != 0)
+    {
+        vstr_weights.emplace("EXTRA", "N/A");
+    }
+
+    return vstr_weights;
+}
+
+bool hyx::weighted_course::add_category(std::string name, double weight, int drop, std::pair<int, std::string> replace) noexcept
+{
+    bool success{false};
+
+    if (not this->is_withdrawn() && not this->is_replaced())
+    {
+        std::transform(name.begin(), name.end(), name.begin(),
+            [](unsigned char c) { return toupper(c); });
+
+        std::transform(replace.second.begin(), replace.second.end(), replace.second.begin(),
+            [](unsigned char c) { return toupper(c); });
+
+        this->m_grade[name];
+        this->m_grade[name].weight = weight;
+        this->m_grade[name].num_of_drops = drop;
+        this->m_grade[name].num_of_replacements = replace.first;
+        this->m_grade[name].replacement_name = replace.second;
+
+        success = true;
+    }
+
+    return success;
+}
+
+//
+// POINT_COURSE
+//
+
+double hyx::point_course::get_total_points() const noexcept
+{
+    return this->m_total_points;
+}
+
+bool hyx::point_course::add_category(std::string name, int drop, std::pair<int, std::string> replace) noexcept
+{
+    bool success{false};
+
+    if (not this->is_withdrawn() && not this->is_replaced())
+    {
+        std::transform(name.begin(), name.end(), name.begin(),
+            [](unsigned char c) { return toupper(c); });
+
+        std::transform(replace.second.begin(), replace.second.end(), replace.second.begin(),
+            [](unsigned char c) { return toupper(c); });
+
+        this->m_grade[name];
+        this->m_grade[name].num_of_drops = drop;
+        this->m_grade[name].num_of_replacements = replace.first;
+        this->m_grade[name].replacement_name = replace.second;
+
+        success = true;
+    }
+
+    return success;
+}
+
+hyx::point_course::point_course(
+    std::string t_name,
+    long t_crn,
+    int t_units,
+    double t_total_points,
+    hyx::grade_scale t_scale,
+    hyx::school* t_institution,
+    std::string t_location,
+    std::string t_instructor,
+    std::string t_subject,
+    std::string t_level,
+    std::string t_details,
+    std::vector<hyx::week_day> t_week_days,
+    std::array<int, 3> t_start_date,
+    std::array<int, 3> t_end_date,
+    std::array<int, 2> t_start_time,
+    std::array<int, 2> t_end_time
+) :
+    course(
+        t_name,
+        t_crn,
+        t_units,
+        t_scale,
+        t_institution,
+        t_location,
+        t_instructor,
+        t_subject,
+        t_level,
+        t_details,
+        t_week_days,
+        t_start_date,
+        t_end_date,
+        t_start_time,
+        t_end_time
+    ),
+    m_total_points(t_total_points)
+{
+}
+
+//
+// OTHER FUNCTIONS
+//
+
+float hyx::get_GPA(const std::vector<hyx::course>& courses) noexcept
+{
+    return std::accumulate(courses.begin(), courses.end(), 0.0f, [](float sum, const hyx::course &crs) { return (crs.is_included_in_gpa()) ? sum + crs.get_grade_points() : sum; })
+    / std::accumulate(courses.begin(), courses.end(), 0.0f, [](float sum, const hyx::course &crs) { return (crs.is_included_in_gpa()) ? sum + crs.get_units() : sum; });
+}
+
 // static const std::string vec_helper(std::vector<std::string> vec) noexcept;
 
 // const std::vector<std::string> weave(const std::vector<std::unordered_map<std::string, std::string>>& vec) noexcept;
@@ -522,174 +760,3 @@ void hyx::course::add_extra_to_total(double extra)
 
 //     return os << ss.str();
 // }
-
-bool hyx::weighted_course::has_good_weights() noexcept
-{
-    double total_weight = 0.0;
-
-    std::for_each(this->m_grade.begin(), this->m_grade.end(),
-        [&](const auto& itr) { total_weight += itr.second.weight; });
-
-    return (std::abs(1 - total_weight) < std::numeric_limits<float>::epsilon()) ? true : false;
-}
-
-void hyx::weighted_course::update_grade() noexcept
-{
-    if (not this->is_withdrawn() && not this->is_replaced() && this->has_good_weights())
-    {
-        double final_grade = 0.0f;
-        double unused_weight = 0.0f;
-
-        for (const auto& itr_grade : this->m_grade)
-        {
-            // if there are points to calculate
-            if (itr_grade.second.points_percent.empty())
-            {
-                unused_weight += itr_grade.second.weight;
-            }
-            else
-            {
-                hyx::grade_container grades{itr_grade.second};
-
-                this->drop_grades(grades);
-
-                this->replace_grades(grades);
-
-                // if all of the grades have been dropped, then treat as if no grades were given
-                if (grades.points_percent.empty())
-                {
-                    unused_weight += grades.weight;
-                }
-                else
-                {
-                    // sum group's grades and apply its weights
-                    final_grade += grades.weight * (std::accumulate(grades.points_earned.begin(), grades.points_earned.end(), 0.0) / std::accumulate(grades.points_possible.begin(), grades.points_possible.end(), 0.0));
-                }
-            }
-        }
-
-        // update stats if there are grades left over.
-        if ((1.0 - unused_weight) > std::numeric_limits<double>::epsilon())
-        {
-            this->m_grade_percent = final_grade * 100.0 / (1.0 - unused_weight) + this->m_extra;
-            this->update_letter();
-            this->update_grade_points();
-        }
-    }
-}
-
-hyx::weighted_course::weighted_course(
-    std::string t_name,
-    long t_crn,
-    int t_units,
-    grade_scale t_scale,
-    hyx::school* t_institution,
-    std::string t_location,
-    std::string t_instructor,
-    std::string t_subject,
-    std::string t_level,
-    std::string t_details,
-    std::vector<week_day> t_week_days,
-    std::array<int, 3> t_start_date,
-    std::array<int, 3> t_end_date,
-    std::array<int, 2> t_start_time,
-    std::array<int, 2> t_end_time
-) :
-    course(
-        t_name,
-        t_crn,
-        t_units,
-        t_scale,
-        t_institution,
-        t_location,
-        t_instructor,
-        t_subject,
-        t_level,
-        t_details,
-        t_week_days,
-        t_start_date,
-        t_end_date,
-        t_start_time,
-        t_end_time
-    )
-{
-}
-
-const std::unordered_map<std::string, std::string> hyx::weighted_course::get_weights() const noexcept
-{
-    std::unordered_map<std::string, std::string> vstr_weights;
-    
-    for (const auto& itr_grade : this->m_grade)
-    {
-        // only emplace grade categories with a name.
-        if (not itr_grade.first.empty())
-        {
-            vstr_weights.emplace(itr_grade.first, std::to_string(itr_grade.second.weight));
-        }
-    }
-
-    if (this->m_extra != 0)
-    {
-        vstr_weights.emplace("EXTRA", "N/A");
-    }
-
-    return vstr_weights;
-}
-
-bool hyx::weighted_course::add_category(std::string name, double weight, int drop, std::pair<int, std::string> replace) noexcept
-{
-    bool success{false};
-
-    if (not this->is_withdrawn() && not this->is_replaced())
-    {
-        std::transform(name.begin(), name.end(), name.begin(),
-            [](unsigned char c) { return toupper(c); });
-
-        std::transform(replace.second.begin(), replace.second.end(), replace.second.begin(),
-            [](unsigned char c) { return toupper(c); });
-
-        this->m_grade[name];
-        this->m_grade[name].weight = weight;
-        this->m_grade[name].num_of_drops = drop;
-        this->m_grade[name].num_of_replacements = replace.first;
-        this->m_grade[name].replacement_name = replace.second;
-
-        success = true;
-    }
-
-    return success;
-}
-
-double hyx::point_course::get_total_points() const noexcept
-{
-    return this->m_total_points;
-}
-
-bool hyx::point_course::add_category(std::string name, int drop, std::pair<int, std::string> replace) noexcept
-{
-    bool success{false};
-
-    if (not this->is_withdrawn() && not this->is_replaced())
-    {
-        std::transform(name.begin(), name.end(), name.begin(),
-            [](unsigned char c) { return toupper(c); });
-
-        std::transform(replace.second.begin(), replace.second.end(), replace.second.begin(),
-            [](unsigned char c) { return toupper(c); });
-
-        this->m_grade[name];
-        this->m_grade[name].num_of_drops = drop;
-        this->m_grade[name].num_of_replacements = replace.first;
-        this->m_grade[name].replacement_name = replace.second;
-
-        success = true;
-    }
-
-    return success;
-}
-
-float hyx::get_GPA(const std::vector<hyx::course>& courses) noexcept
-{
-    return std::accumulate(courses.begin(), courses.end(), 0.0f, [](float sum, const hyx::course &crs) { return (crs.is_included_in_gpa()) ? sum + crs.get_grade_points() : sum; })
-    / std::accumulate(courses.begin(), courses.end(), 0.0f, [](float sum, const hyx::course &crs) { return (crs.is_included_in_gpa()) ? sum + crs.get_units() : sum; });
-}

@@ -10,6 +10,7 @@
 
 #include <array>         // array
 #include <ctime>         // tm
+#include <memory>      // unique_ptr
 #include <string>        // string
 #include <tuple>         // tuple
 #include <unordered_map> // unordered_map
@@ -136,13 +137,13 @@ namespace hyx
         std::string m_name;
         long m_crn;
         int m_units;
-        grade_scale m_scale;
+        hyx::grade_scale m_scale;
         hyx::school* m_institution;
         std::string m_location;
         std::string m_instructor;
         std::string m_subject_level;
         std::string m_details;
-        std::vector<week_day> m_week_days;
+        std::vector<hyx::week_day> m_week_days;
         std::tm m_start_datetime;
         std::tm m_end_datetime;
         
@@ -150,8 +151,10 @@ namespace hyx
         std::string m_grade_letter;
         float m_grade_points;
 
+        std::vector<std::shared_ptr<hyx::course>> m_linked_courses;
+
     protected:
-        std::unordered_map<std::string, grade_container> m_grade;
+        std::unordered_map<std::string, hyx::grade_container> m_grade;
 
         double m_extra;
 
@@ -161,9 +164,9 @@ namespace hyx
 
         bool update_grade_points() noexcept;
 
-        void drop_grades(grade_container& grades) noexcept;
+        void drop_grades(hyx::grade_container& grades) noexcept;
 
-        void replace_grades(grade_container& grades) noexcept;
+        void replace_grades(hyx::grade_container& grades) noexcept;
 
         void virtual update_grade() = 0;
 
@@ -172,7 +175,7 @@ namespace hyx
             std::string t_name,
             long t_crn,
             int t_units,
-            grade_scale t_scale,
+            hyx::grade_scale t_scale,
             hyx::school* t_institution,
             std::string t_location,
             std::string t_instructor,
@@ -220,6 +223,8 @@ namespace hyx
 
         [[nodiscard]] float get_grade_points() const noexcept;
 
+        void link_course(std::shared_ptr<hyx::course> course) noexcept;
+
         bool is_withdrawn() const noexcept;
 
         bool is_replaced() const noexcept;
@@ -259,14 +264,14 @@ namespace hyx
             std::string t_name,
             long t_crn,
             int t_units,
-            grade_scale t_scale,
+            hyx::grade_scale t_scale,
             hyx::school* t_institution,
             std::string t_location,
             std::string t_instructor,
             std::string t_subject,
             std::string t_level,
             std::string t_details,
-            std::vector<week_day> t_week_days = {},
+            std::vector<hyx::week_day> t_week_days = {},
             std::array<int, 3> t_start_date = {-1, -1, -1},
             std::array<int, 3> t_end_date = {-1, -1, -1},
             std::array<int, 2> t_start_time = { -1, -1 },
@@ -292,13 +297,15 @@ namespace hyx
             std::string t_name,
             long t_crn,
             int t_units,
-            double total_points,
-            grade_scale t_scale,
+            double t_total_points,
+            hyx::grade_scale t_scale,
             hyx::school* t_institution,
             std::string t_location,
             std::string t_instructor,
+            std::string t_subject,
+            std::string t_level,
             std::string t_details,
-            std::vector<week_day> t_week_days = {},
+            std::vector<hyx::week_day> t_week_days = {},
             std::array<int, 3> t_start_date = {-1, -1, -1},
             std::array<int, 3> t_end_date = {-1, -1, -1},
             std::array<int, 2> t_start_time = { -1, -1 },
