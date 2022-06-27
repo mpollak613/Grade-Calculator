@@ -1,11 +1,12 @@
-/* Copyright 2021 Michael Pollak.
+/* Copyright 2021-2022 Michael Pollak.
  *
  * Use of this source code is governed by an MIT-style
  * licence that can be found in the LICENSE file.
  */
 
-
 #include "hyx_course.h"
+#include "hyx_scales.h"
+#include "hyx_school.h"
 
 #include <algorithm>  // transform, for_each, max_element
 #include <cmath>      // floor
@@ -21,31 +22,6 @@
 #include <sstream>    // stringstream
 #include <string>     // string
 
-
-//
-// SCHOOL
-//
-
-hyx::school::school(
-    std::string t_name,
-    grade_point_scale t_scale
-) :
-    m_name(t_name),
-    m_scale(t_scale)
-{
-}
-
-const std::string& hyx::school::get_name() const noexcept
-{
-    return this->m_name;
-}
-
-const hyx::school::grade_point_scale& hyx::school::get_scale() const noexcept
-{
-    return this->m_scale;
-}
-
-
 //
 // COURSE
 //
@@ -54,7 +30,7 @@ void hyx::course::update_letter() noexcept
 {
     double grade_percent{this->m_grade_percent};
 
-    // in the case the grade percent is greater than 100 
+    // to check for letters, we cannot have greater than 100 percent.
     if (this->m_grade_percent > 100)
     {
         grade_percent = 100;
@@ -127,21 +103,21 @@ void hyx::course::replace_grades(hyx::grade_container& grades) noexcept
 }
 
 hyx::course::course(
-    std::string t_name,
-    long t_crn,
-    int t_units,
-    hyx::grade_scale t_scale,
-    hyx::school* t_institution,
-    std::string t_location,
-    std::string t_instructor,
-    std::string t_subject,
-    std::string t_level,
-    std::string t_details,
-    std::vector<hyx::week_day> t_week_days,
-    std::array<int, 3> t_start_date,
-    std::array<int, 3> t_end_date,
-    std::array<int, 2> t_start_time,
-    std::array<int, 2> t_end_time
+    const std::string t_name,
+    const long t_crn,
+    const int t_units,
+    const hyx::grade_scale &t_scale,
+    const hyx::school* t_institution,
+    const std::string t_location,
+    const std::string t_instructor,
+    const std::string t_subject,
+    const std::string t_level,
+    const std::string t_details,
+    const hyx::week_day t_week_days,
+    const std::array<int, 3> &t_start_date,
+    const std::array<int, 3> &t_end_date,
+    const std::array<int, 2> &t_start_time,
+    const std::array<int, 2> &t_end_time
 ) :
     m_name(t_name),
     m_crn(t_crn),
@@ -172,8 +148,6 @@ hyx::course::course(
     m_end_datetime.tm_hour = t_end_time[0];
     m_end_datetime.tm_min = t_end_time[1];
     m_end_datetime.tm_sec = 0;
-
-    std::sort(m_week_days.begin(), m_week_days.end());
 }
 
 const std::string& hyx::course::get_name() const noexcept
@@ -236,13 +210,19 @@ const std::string hyx::course::get_week_days() const noexcept
 {
     std::string str_week_days;
 
-    std::string LUT_week_days{'-', 'U', 'M', 'T', 'W', 'R', 'F', 'S'};
+    ((this->m_week_days & hyx::week_day::SUNDAY) == hyx::week_day::SUNDAY) ? str_week_days.push_back('U') : str_week_days.push_back('-');
+    
+    ((this->m_week_days & hyx::week_day::MONDAY) == hyx::week_day::MONDAY) ? str_week_days.push_back('M') : str_week_days.push_back('-');
 
-    // note that m_week_days will be sorted from small to large.
-    for (size_t i = 0; i < this->m_week_days.size(); ++i)
-    {
-        str_week_days.push_back(LUT_week_days[this->m_week_days[i]]);
-    }
+    ((this->m_week_days & hyx::week_day::TUESDAY) == hyx::week_day::TUESDAY) ? str_week_days.push_back('T') : str_week_days.push_back('-');
+
+    ((this->m_week_days & hyx::week_day::WEDNESDAY) == hyx::week_day::WEDNESDAY) ? str_week_days.push_back('W') : str_week_days.push_back('-');
+
+    ((this->m_week_days & hyx::week_day::THURSDAY) == hyx::week_day::THURSDAY) ? str_week_days.push_back('R') : str_week_days.push_back('-');
+
+    ((this->m_week_days & hyx::week_day::FRIDAY) == hyx::week_day::FRIDAY) ? str_week_days.push_back('F') : str_week_days.push_back('-');
+
+    ((this->m_week_days & hyx::week_day::SATURDAY) == hyx::week_day::SATURDAY) ? str_week_days.push_back('S') : str_week_days.push_back('-');
 
     return str_week_days;
 }
@@ -270,12 +250,12 @@ const std::string to_ISO_time(std::tm time) noexcept
     return buff;
 }
 
-const std::tm hyx::course::get_start_datetime() const noexcept
+const std::tm &hyx::course::get_start_datetime() const noexcept
 {
     return this->m_start_datetime;
 }
 
-const std::tm hyx::course::get_end_datetime() const noexcept
+const std::tm &hyx::course::get_end_datetime() const noexcept
 {
     return this->m_end_datetime;
 }
@@ -355,9 +335,23 @@ float hyx::course::get_grade_points() const noexcept
     return this->m_grade_points;
 }
 
-void hyx::course::link_course(std::shared_ptr<hyx::course> course) noexcept
+void hyx::course::link_course(hyx::course &course) noexcept
 {
-    this->m_linked_courses.push_back(course);
+    bool has_course = false;
+    for (auto linked_course : this->m_linked_courses)
+    {
+        if (&linked_course.get() == &course)
+        {
+            has_course = true;
+        }
+    }
+
+    if (!has_course)
+    {
+        this->m_linked_courses.push_back(course);
+
+        course.m_linked_courses.push_back(*this);
+    }
 }
 
 bool hyx::course::is_withdrawn() const noexcept
@@ -409,7 +403,7 @@ void hyx::course::set_pass_fail() noexcept
     this->update_grade_points();
 }
 
-bool hyx::course::add_book(std::string book) noexcept
+bool hyx::course::add_book(const std::string &book) noexcept
 {
     bool success{false};
 
@@ -511,21 +505,21 @@ void hyx::weighted_course::update_grade() noexcept
 }
 
 hyx::weighted_course::weighted_course(
-    std::string t_name,
-    long t_crn,
-    int t_units,
-    hyx::grade_scale t_scale,
-    hyx::school* t_institution,
-    std::string t_location,
-    std::string t_instructor,
-    std::string t_subject,
-    std::string t_level,
-    std::string t_details,
-    std::vector<hyx::week_day> t_week_days,
-    std::array<int, 3> t_start_date,
-    std::array<int, 3> t_end_date,
-    std::array<int, 2> t_start_time,
-    std::array<int, 2> t_end_time
+    const std::string t_name,
+    const long t_crn,
+    const int t_units,
+    const hyx::grade_scale &t_scale,
+    const hyx::school* t_institution,
+    const std::string t_location,
+    const std::string t_instructor,
+    const std::string t_subject,
+    const std::string t_level,
+    const std::string t_details,
+    const hyx::week_day t_week_days,
+    const std::array<int, 3> &t_start_date,
+    const std::array<int, 3> &t_end_date,
+    const std::array<int, 2> &t_start_time,
+    const std::array<int, 2> &t_end_time
 ) :
     course(
         t_name,
@@ -617,38 +611,38 @@ void hyx::point_course::update_grade() noexcept
 
                 this->replace_grades(grades);
 
-                // if all of the grades have been dropped then skip
-                if (not grades.points_percent.empty())
-                {
-                    total_earned_points += std::accumulate(grades.points_earned.begin(), grades.points_earned.end(), 0.0);
-                    total_possible_points += std::accumulate(grades.points_possible.begin(), grades.points_possible.end(), 0.0);
-                }
+                total_earned_points += std::accumulate(grades.points_earned.begin(), grades.points_earned.end(), 0.0);
+                total_possible_points += std::accumulate(grades.points_possible.begin(), grades.points_possible.end(), 0.0);
             }
         }
 
-        this->m_grade_percent = (total_earned_points + this->m_extra) * 100.0 / total_possible_points;
-        this->update_letter();
-        this->update_grade_points();
+        // update stats if there are grades left over.
+        if (total_possible_points != 0.0)
+        {
+            this->m_grade_percent = (total_earned_points + this->m_extra) * 100.0 / total_possible_points;
+            this->update_letter();
+            this->update_grade_points();
+        }
     }
 }
 
 hyx::point_course::point_course(
-    std::string t_name,
-    long t_crn,
-    int t_units,
-    double t_total_points,
-    hyx::grade_scale t_scale,
-    hyx::school* t_institution,
-    std::string t_location,
-    std::string t_instructor,
-    std::string t_subject,
-    std::string t_level,
-    std::string t_details,
-    std::vector<hyx::week_day> t_week_days,
-    std::array<int, 3> t_start_date,
-    std::array<int, 3> t_end_date,
-    std::array<int, 2> t_start_time,
-    std::array<int, 2> t_end_time
+    const std::string t_name,
+    const long t_crn,
+    const int t_units,
+    const double t_total_points,
+    const hyx::grade_scale &t_scale,
+    const hyx::school* t_institution,
+    const std::string t_location,
+    const std::string t_instructor,
+    const std::string t_subject,
+    const std::string t_level,
+    const std::string t_details,
+    const hyx::week_day t_week_days,
+    const std::array<int, 3> &t_start_date,
+    const std::array<int, 3> &t_end_date,
+    const std::array<int, 2> &t_start_time,
+    const std::array<int, 2> &t_end_time
 ) :
     course(
         t_name,

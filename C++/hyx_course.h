@@ -1,4 +1,4 @@
-/* Copyright 2021 Michael Pollak.
+/* Copyright 2021-2022 Michael Pollak.
  *
  * Use of this source code is governed by an MIT-style
  * licence that can be found in the LICENSE file.
@@ -7,112 +7,60 @@
 #ifndef HYX_COURSE_H
 #define HYX_COURSE_H
 
+#include "hyx_school.h"
 
-#include <array>         // array
-#include <ctime>         // tm
-#include <memory>      // unique_ptr
-#include <string>        // string
-#include <tuple>         // tuple
-#include <unordered_map> // unordered_map
-#include <utility>       // pair
-#include <vector>        // vector
-
+#include <array>      // array
+#include <ctime>      // tm
+#include <functional> // reference_wrapper
+#include <string>     // string
+#include <tuple>      // tuple
+#include <utility>    // pair
+#include <vector>     // vector
 
 namespace hyx
 {
-
-    enum week_day
+    enum class week_day
     {
-        NO_DAY,
-        SUNDAY,
-        MONDAY,
-        TUESDAY,
-        WEDNESDAY,
-        THURSDAY,
-        FRIDAY,
-        SATURDAY
+        NO_DAY = 0x0,
+        SUNDAY = 0x1,
+        MONDAY = 0x2,
+        TUESDAY = 0x4,
+        WEDNESDAY = 0x8,
+        THURSDAY = 0x10,
+        FRIDAY = 0x20,
+        SATURDAY = 0x40,
+        SUN = SUNDAY,
+        MON = MONDAY,
+        TUE = TUESDAY,
+        WED = WEDNESDAY,
+        THU = THURSDAY,
+        FRI = FRIDAY,
+        SAT = SATURDAY,
+        TUESDAY_THURSDAY = TUESDAY | THURSDAY,
+        MONDAY_WEDNESDAY_FRIDAY = MONDAY | WEDNESDAY | FRIDAY,
+        TUE_THU = TUESDAY_THURSDAY,
+        MON_WED_FRI = MONDAY_WEDNESDAY_FRIDAY,
+        ALL_WEEK_DAYS_NFRIDAY = MONDAY | TUESDAY | WEDNESDAY | THURSDAY,
+        ALL_WEEK_DAYS_NFRI = ALL_WEEK_DAYS_NFRIDAY,
+        ALL_WEEK_DAYS = ALL_WEEK_DAYS_NFRI | FRIDAY,
+        ALL_DAYS = SUNDAY | ALL_WEEK_DAYS | SATURDAY
     };
-    
-    typedef std::unordered_map<std::string, std::pair<int, int>> grade_scale;
 
-    namespace scale
+    constexpr week_day operator| (week_day lhs, week_day rhs)
     {
-        inline const static grade_scale STD({
-            {"A", {90, 100}},
-            {"B", {80, 89}},
-            {"C", {70, 79}},
-            {"D", {60, 69}},
-            {"F", {0, 59}}
-            });
+        using underlying_t = typename std::underlying_type<week_day>::type;
 
-        inline const static grade_scale G11({
-            {"A", {90, 100}},
-            {"A-", {85, 89}},
-            {"B+", {80, 84}},
-            {"B", {75, 79}},
-            {"B-", {70, 74}},
-            {"C+", {67, 69}},
-            {"C", {64, 66}},
-            {"C-", {60, 63}},
-            {"D+", {57, 59}},
-            {"D", {54, 56}},
-            {"D-", {50, 53}},
-            {"F", {0, 49}}
-            });
-
-        inline const static grade_scale U12({
-            {"A", {93, 100}},
-            {"A-", {90, 92}},
-            {"B+", {87, 89}},
-            {"B", {83, 86}},
-            {"B-", {80, 82}},
-            {"C+", {77, 79}},
-            {"C", {73, 76}},
-            {"C-", {70, 72}},
-            {"D", {60, 69}},
-            {"F", {0, 59}}
-            });
-
-        inline const static grade_scale U11({
-            {"A", {93, 100}},
-            {"A-", {90, 92}},
-            {"B+", {87, 89}},
-            {"B", {83, 86}},
-            {"B-", {80, 82}},
-            {"C+", {77, 79}},
-            {"C", {73, 76}},
-            {"C-", {70, 72}},
-            {"D+", {67, 69}},
-            {"D", {63, 66}},
-            {"D-", {60, 62}},
-            {"F", {0, 59}}
-            });
-
-        inline const static grade_scale PF({
-            {"P", {60, 100}},
-            {"NP", {0, 59}}
-            });
+        return static_cast<week_day>(
+            static_cast<underlying_t>(lhs) | static_cast<underlying_t>(rhs));
     }
 
-    class school
+    constexpr week_day operator& (week_day lhs, week_day rhs)
     {
-    public:
-        typedef std::unordered_map<std::string, float> grade_point_scale;
+        using underlying_t = typename std::underlying_type<week_day>::type;
 
-    private:
-        std::string m_name;
-        grade_point_scale m_scale;
-
-    public:
-        school(
-            std::string t_name,
-            grade_point_scale t_scale
-            );
-
-        [[nodiscard]] const std::string& get_name() const noexcept;
-
-        [[nodiscard]] const grade_point_scale& get_scale() const noexcept;
-    };
+        return static_cast<week_day>(
+            static_cast<underlying_t>(lhs) & static_cast<underlying_t>(rhs));
+    }
 
     struct grade_container
     {
@@ -138,12 +86,12 @@ namespace hyx
         long m_crn;
         int m_units;
         hyx::grade_scale m_scale;
-        hyx::school* m_institution;
+        const hyx::school* m_institution;
         std::string m_location;
         std::string m_instructor;
         std::string m_subject_level;
         std::string m_details;
-        std::vector<hyx::week_day> m_week_days;
+        hyx::week_day m_week_days;
         std::tm m_start_datetime;
         std::tm m_end_datetime;
         
@@ -151,7 +99,7 @@ namespace hyx
         std::string m_grade_letter;
         float m_grade_points;
 
-        std::vector<std::shared_ptr<hyx::course>> m_linked_courses;
+        std::vector<std::reference_wrapper<const hyx::course>> m_linked_courses;
 
     protected:
         std::unordered_map<std::string, hyx::grade_container> m_grade;
@@ -170,24 +118,25 @@ namespace hyx
 
         void virtual update_grade() = 0;
 
-    public:
         course(
-            std::string t_name,
-            long t_crn,
-            int t_units,
-            hyx::grade_scale t_scale,
-            hyx::school* t_institution,
-            std::string t_location,
-            std::string t_instructor,
-            std::string t_subject,
-            std::string t_level,
-            std::string t_details,
-            std::vector<week_day> t_week_days = {},
-            std::array<int, 3> t_start_date = {-1, -1, -1},
-            std::array<int, 3> t_end_date = {-1, -1, -1},
-            std::array<int, 2> t_start_time = { -1, -1 },
-            std::array<int, 2> t_end_time = { -1, -1 }
+            const std::string t_name,
+            const long t_crn,
+            const int t_units,
+            const hyx::grade_scale &t_scale,
+            const hyx::school* t_institution,
+            const std::string t_location,
+            const std::string t_instructor,
+            const std::string t_subject,
+            const std::string t_level,
+            const std::string t_details,
+            const hyx::week_day t_week_days = hyx::week_day::NO_DAY,
+            const std::array<int, 3> &t_start_date = {-1, -1, -1},
+            const std::array<int, 3> &t_end_date = {-1, -1, -1},
+            const std::array<int, 2> &t_start_time = { -1, -1 },
+            const std::array<int, 2> &t_end_time = { -1, -1 }
         );
+
+    public:
 
         [[nodiscard]] const std::string& get_name() const noexcept;
 
@@ -197,21 +146,21 @@ namespace hyx
 
         [[nodiscard]] const std::string get_scale() const noexcept;
 
-        [[nodiscard]] const std::string& get_location() const noexcept;
+        [[nodiscard]] const std::string &get_location() const noexcept;
 
-        [[nodiscard]] const std::string& get_instructor() const noexcept;
+        [[nodiscard]] const std::string &get_instructor() const noexcept;
 
         [[nodiscard]] const std::string get_subject_level() const noexcept;
 
-        [[nodiscard]] const std::string& get_details() const noexcept;
+        [[nodiscard]] const std::string &get_details() const noexcept;
 
         [[nodiscard]] const std::string get_week_days() const noexcept;
 
-        [[nodiscard]] const std::tm get_start_datetime() const noexcept;
+        [[nodiscard]] const std::tm &get_start_datetime() const noexcept;
 
-        [[nodiscard]] const std::tm get_end_datetime() const noexcept;
+        [[nodiscard]] const std::tm &get_end_datetime() const noexcept;
 
-        [[nodiscard]] const std::vector<std::string>& get_books() const noexcept;
+        [[nodiscard]] const std::vector<std::string> &get_books() const noexcept;
 
         [[nodiscard]] double get_grade() const noexcept;
 
@@ -223,15 +172,15 @@ namespace hyx
 
         [[nodiscard]] float get_grade_points() const noexcept;
 
-        void link_course(std::shared_ptr<hyx::course> course) noexcept;
+        void link_course(hyx::course &course) noexcept;
 
-        bool is_withdrawn() const noexcept;
+        [[nodiscard]] bool is_withdrawn() const noexcept;
 
-        bool is_replaced() const noexcept;
+        [[nodiscard]] bool is_replaced() const noexcept;
 
-        bool is_incomplete() const noexcept;
+        [[nodiscard]] bool is_incomplete() const noexcept;
 
-        bool is_included_in_gpa() const noexcept;
+        [[nodiscard]] bool is_included_in_gpa() const noexcept;
 
         void set_withdrawn() noexcept;
 
@@ -241,18 +190,16 @@ namespace hyx
 
         void set_pass_fail() noexcept;
 
-        bool add_book(std::string book) noexcept;
+        bool add_book(const std::string &book) noexcept;
     
         bool add_grade(std::string name, double earn, double poss) noexcept;
 
         //bool virtual add_category() = 0;
 
         void add_extra_to_total(double extra);
-
     };
 
-    class weighted_course
-        : public course
+    class weighted_course : public course
     {
     private:
         bool has_good_weights() noexcept;
@@ -261,31 +208,29 @@ namespace hyx
 
     public:
         weighted_course(
-            std::string t_name,
-            long t_crn,
-            int t_units,
-            hyx::grade_scale t_scale,
-            hyx::school* t_institution,
-            std::string t_location,
-            std::string t_instructor,
-            std::string t_subject,
-            std::string t_level,
-            std::string t_details,
-            std::vector<hyx::week_day> t_week_days = {},
-            std::array<int, 3> t_start_date = {-1, -1, -1},
-            std::array<int, 3> t_end_date = {-1, -1, -1},
-            std::array<int, 2> t_start_time = { -1, -1 },
-            std::array<int, 2> t_end_time = { -1, -1 }
+            const std::string t_name,
+            const long t_crn,
+            const int t_units,
+            const hyx::grade_scale &t_scale,
+            const hyx::school* t_institution,
+            const std::string t_location,
+            const std::string t_instructor,
+            const std::string t_subject,
+            const std::string t_level,
+            const std::string t_details,
+            const hyx::week_day t_week_days = hyx::week_day::NO_DAY,
+            const std::array<int, 3> &t_start_date = {-1, -1, -1},
+            const std::array<int, 3> &t_end_date = {-1, -1, -1},
+            const std::array<int, 2> &t_start_time = { -1, -1 },
+            const std::array<int, 2> &t_end_time = { -1, -1 }
         );
 
         [[nodiscard]] const std::unordered_map<std::string, std::string> get_weights() const noexcept;
 
         bool add_category(std::string name, double weight, int drop = 0, std::pair<int, std::string> replace = { 0, "" }) noexcept;
-
     };
 
-    class point_course
-        : public course
+    class point_course : public course
     {
     private:
         double m_total_points;
@@ -294,28 +239,27 @@ namespace hyx
 
     public:
         point_course(
-            std::string t_name,
-            long t_crn,
-            int t_units,
-            double t_total_points,
-            hyx::grade_scale t_scale,
-            hyx::school* t_institution,
-            std::string t_location,
-            std::string t_instructor,
-            std::string t_subject,
-            std::string t_level,
-            std::string t_details,
-            std::vector<hyx::week_day> t_week_days = {},
-            std::array<int, 3> t_start_date = {-1, -1, -1},
-            std::array<int, 3> t_end_date = {-1, -1, -1},
-            std::array<int, 2> t_start_time = { -1, -1 },
-            std::array<int, 2> t_end_time = { -1, -1 }
+            const std::string t_name,
+            const long t_crn,
+            const int t_units,
+            const double t_total_points,
+            const hyx::grade_scale &t_scale,
+            const hyx::school* t_institution,
+            const std::string t_location,
+            const std::string t_instructor,
+            const std::string t_subject,
+            const std::string t_level,
+            const std::string t_details,
+            const hyx::week_day t_week_days = hyx::week_day::NO_DAY,
+            const std::array<int, 3> &t_start_date = {-1, -1, -1},
+            const std::array<int, 3> &t_end_date = {-1, -1, -1},
+            const std::array<int, 2> &t_start_time = { -1, -1 },
+            const std::array<int, 2> &t_end_time = { -1, -1 }
         );
 
         [[nodiscard]] double get_total_points() const noexcept;
 
         bool add_category(std::string name, int drop = 0, std::pair<int, std::string> replace = { 0, "" }) noexcept;
-
     };
 
     [[nodiscard]] float get_GPA(const std::vector<hyx::course>& courses) noexcept;
